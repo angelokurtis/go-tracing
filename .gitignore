@@ -13,3 +13,9 @@
 
 # Dependency directories
 vendor/
+
+# JetBrains IDEs
+*.iml
+*.ipr
+*.iws
+.idea/
