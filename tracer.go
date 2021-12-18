@@ -1,77 +1,34 @@
 package tracing
 
 import (
-	"context"
 	"fmt"
+	"io"
+
 	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	"net/http"
-	"runtime"
-	"strings"
+	"github.com/uber/jaeger-client-go/config"
 )
 
-var mod string
-
-type SpanOptions struct{ operationName string }
-
-func (o *SpanOptions) OperationName() string {
-	if o.operationName == "" {
-		pc, _, _, _ := runtime.Caller(2)
-		details := runtime.FuncForPC(pc)
-		name := details.Name()
-		return strings.Replace(name, mod, "", 1)
-	}
-	return o.operationName
-}
-
-type SpanOptionFunc func(*SpanOptions)
-
-func WithOperationName(operation string) SpanOptionFunc {
-	return func(o *SpanOptions) {
-		o.operationName = operation
-	}
-}
-
-func StartSpanFromContext(ctx context.Context, options ...SpanOptionFunc) (*Span, context.Context) {
-	opt := new(SpanOptions)
+// Initialize create an instance of Jaeger Tracer and sets it as GlobalTracer.
+func Initialize(module string, options ...TracerOptionFunc) (io.Closer, error) {
+	set(module, module)
+	cfg := new(config.Configuration)
 
 	for _, fn := range options {
 		if fn == nil {
 			continue
 		}
-		fn(opt)
+		fn(cfg)
 	}
 
-	span, ctx := opentracing.StartSpanFromContext(ctx, opt.operationName)
-	return &Span{Span: span}, ctx
-}
-
-func StartSpanFromRequest(r *http.Request) (*Span, context.Context) {
-	ctx := ExtractSpanContextFromRequest(r)
-	span, ctxWithSpan := opentracing.StartSpanFromContext(r.Context(), r.Method+" "+r.URL.Path, ext.RPCServerOption(ctx))
-
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
+	cfg, err := cfg.FromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("cannot read environment variables: %w", err)
 	}
-	ext.HTTPUrl.Set(span, fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI))
-	ext.HTTPMethod.Set(span, r.Method)
-	span.SetTag("http.protocol", r.Proto)
-
-	return &Span{Span: span}, ctxWithSpan
-}
-
-func SpanFromContext(ctx context.Context) *Span {
-	span := opentracing.SpanFromContext(ctx)
-	if span == nil {
-		return nil
+	tracer, closer, err := cfg.NewTracer()
+	if err != nil {
+		return nil, fmt.Errorf("cannot create tracer: %w", err)
 	}
 
-	return &Span{Span: span}
-}
-
-func ExtractSpanContextFromRequest(r *http.Request) opentracing.SpanContext {
-	tracer := opentracing.GlobalTracer()
-	ctx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
-	return ctx
+	opentracing.SetGlobalTracer(tracer)
+	return closer, nil
 }
