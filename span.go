@@ -54,6 +54,13 @@ func (s *Span) SetError(err error) {
 	s.LogFields(fields...)
 }
 
+func (s *Span) HandleError(err error) error {
+	if err != nil {
+		s.SetError(err)
+	}
+	return err
+}
+
 func (s *Span) SetHTTPResponseStatus(status int) {
 	ext.HTTPStatusCode.Set(s, uint16(status))
 
