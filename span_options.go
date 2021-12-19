@@ -15,10 +15,15 @@ type SpanOptions struct {
 func (o *SpanOptions) Operation() string {
 	if o.operation == "" {
 		pc, _, _, _ := runtime.Caller(2)
-		details := runtime.FuncForPC(pc)
-		name := details.Name()
-		module := cache.data["module"]
-		return strings.Replace(name, module, "", 1)
+		funcName := runtime.FuncForPC(pc).Name()
+		lastSlash := strings.LastIndexByte(funcName, '/')
+		if lastSlash < 0 {
+			lastSlash = 0
+		} else {
+			lastSlash++
+		}
+		firstDot := strings.IndexByte(funcName[lastSlash:], '.') + lastSlash
+		return funcName[firstDot+1:]
 	}
 	return o.operation
 }
