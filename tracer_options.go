@@ -52,7 +52,7 @@ func WithEndpoint(endpoint string) TracerOptionFunc {
 		if err != nil {
 			return errors.Wrapf(err, "cannot parse collector endpoint %s", endpoint)
 		}
-		if o.Reporter != nil {
+		if o.Reporter == nil {
 			o.Reporter = new(config.ReporterConfig)
 		}
 		o.Reporter.CollectorEndpoint = u.String()
