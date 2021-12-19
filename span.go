@@ -18,24 +18,31 @@ type (
 		opentracing.Span
 	}
 	Info struct {
-		TraceID   string
-		SpanID    string
-		ParentID  string
-		IsSampled bool
+		OperationName string
+		TraceID       string
+		SpanID        string
+		ParentID      string
+		IsSampled     bool
 	}
 )
 
 func (s *Span) String() string {
-	return fmt.Sprintf("%+v", s.Span)
+	i := s.Info()
+	return fmt.Sprintf("[%s:%s:%s:%t]", i.TraceID, i.SpanID, i.ParentID, i.IsSampled)
 }
 
 func (s *Span) Info() *Info {
-	if sc, ok := s.Context().(jaeger.SpanContext); ok {
+	var operation string
+	if js, ok := s.Span.(*jaeger.Span); ok {
+		operation = js.OperationName()
+	}
+	if jsc, ok := s.Context().(jaeger.SpanContext); ok {
 		return &Info{
-			TraceID:   sc.TraceID().String(),
-			SpanID:    sc.SpanID().String(),
-			ParentID:  sc.ParentID().String(),
-			IsSampled: sc.IsSampled(),
+			OperationName: operation,
+			TraceID:       jsc.TraceID().String(),
+			SpanID:        jsc.SpanID().String(),
+			ParentID:      jsc.ParentID().String(),
+			IsSampled:     jsc.IsSampled(),
 		}
 	}
 	return nil
