@@ -1,6 +1,9 @@
 package tracing
 
 import (
+	"net/url"
+
+	"github.com/pkg/errors"
 	"github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
 )
@@ -14,32 +17,45 @@ const (
 	RemoteSampler        SamplerType = jaeger.SamplerTypeRemote
 )
 
-// JAEGER_SAMPLER_TYPE=const
-// JAEGER_SAMPLER_PARAM="1"
-// JAEGER_ENDPOINT=http://jaeger-collector.lvh.me/api/traces
-
-type TracerOptionFunc func(*config.Configuration)
+type TracerOptionFunc func(*config.Configuration) error
 
 func WithServiceName(service string) TracerOptionFunc {
-	return func(o *config.Configuration) {
+	return func(o *config.Configuration) error {
 		o.ServiceName = service
+		return nil
 	}
 }
 
 func WithSamplerType(samplerType SamplerType) TracerOptionFunc {
-	return func(o *config.Configuration) {
-		o.Sampler = samplerType
+	return func(o *config.Configuration) error {
+		if o.Sampler == nil {
+			o.Sampler = new(config.SamplerConfig)
+		}
+		o.Sampler.Type = string(samplerType)
+		return nil
 	}
 }
 
-func WithSamplerParam(samplerParam float32) TracerOptionFunc {
-	return func(o *config.Configuration) {
-		o.SamplerParam = samplerParam
+func WithSamplerParam(samplerParam float64) TracerOptionFunc {
+	return func(o *config.Configuration) error {
+		if o.Sampler == nil {
+			o.Sampler = new(config.SamplerConfig)
+		}
+		o.Sampler.Param = samplerParam
+		return nil
 	}
 }
 
 func WithEndpoint(endpoint string) TracerOptionFunc {
-	return func(o *config.Configuration) {
-		o.Endpoint = endpoint
+	return func(o *config.Configuration) error {
+		u, err := url.ParseRequestURI(endpoint)
+		if err != nil {
+			return errors.Wrapf(err, "cannot parse collector endpoint %s", endpoint)
+		}
+		if o.Reporter != nil {
+			o.Reporter = new(config.ReporterConfig)
+		}
+		o.Reporter.CollectorEndpoint = u.String()
+		return nil
 	}
 }
